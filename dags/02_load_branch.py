@@ -6,6 +6,7 @@ from time import time_ns
 from datetime import datetime , timedelta
 from airflow.utils.dates import days_ago
 from datetime import date 
+from airflow.utils.trigger_rule import TriggerRule
 
 default_args = {
     'owner': 'Datapath',
@@ -71,6 +72,7 @@ with DAG(
     load_bi = PythonOperator(
         task_id='load_bi',
         python_callable=fun_load_bi,
+        trigger_rule=TriggerRule.ALL_DONE,
         dag=dag
     )
     load_raw>>branch>>[load_master_complete,load_master_delta]>>load_bi
