@@ -86,6 +86,65 @@ def ingestar_orders_process():
     else : 
         print('alerta no hay registros en la tabla orders')
 
+def ingestar_order_items_process():
+    print("Ingestar desde order_items!")
+    client = bigquery.Client(project='my-first-project-411501')
+    query_string = """
+    drop table if exists `my-first-project-411501.dep_raw.order_items` ;
+    """
+    query_job = client.query(query_string)
+    rows = list(query_job.result())
+    print(rows)
+    print("Borrar order_items!")
+
+    dbconnect = get_connect_mongo()
+    dbname=dbconnect["retail_db"]
+    collection_name = dbname["order_items"] 
+    order_items = collection_name.find({})  
+    order_items_df = DataFrame(order_items)
+    dbconnect.close()
+
+    order_items_df['_id'] = order_items_df['_id'].astype(str)
+
+    order_items_df['order_date']  = order_items_df['order_date'].map(transform_date)
+    order_items_df['order_date'] = pd.to_datetime(order_items_df['order_date'], format='%Y-%m-%d').dt.date
+
+    order_items_df.dtypes
+
+    order_items_rows=len(order_items_df)
+    if order_items_rows>0 :
+        client = bigquery.Client(project='my-first-project-411501')
+
+        table_id =  "my-first-project-411501.dep_raw.order_items"
+        job_config = bigquery.LoadJobConfig(
+            schema=[
+                bigquery.SchemaField("_id", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("order_date", bigquery.enums.SqlTypeNames.DATE),
+                bigquery.SchemaField("order_item_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_item_order_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_item_product_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_item_quantity", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_item_subtotal", bigquery.enums.SqlTypeNames.FLOAT),
+                bigquery.SchemaField("order_item_product_price", bigquery.enums.SqlTypeNames.FLOAT),
+            ],
+            write_disposition="WRITE_TRUNCATE",
+        )
+
+
+        job = client.load_table_from_dataframe(
+            order_items_df, table_id, job_config=job_config
+        )  
+        job.result()  # Wait for the job to complete.
+
+        table = client.get_table(table_id)  # Make an API request.
+        print(
+            "Loaded {} rows and {} columns to {}".format(
+                table.num_rows, len(table.schema), table_id
+            )
+        )
+    else : 
+        print('alerta no hay registros en la tabla order_items')
+
 
 def end_process():
     print(" FIN DEL PROCESO!")
@@ -145,6 +204,11 @@ with DAG(
         python_callable=ingestar_orders_process,
         dag=dag
     )
+    step_ingestar_order_items = PythonOperator(
+        task_id='step_ingestar_order_items_id',
+        python_callable=ingestar_order_items_process,
+        dag=dag
+    )
     step_load = PythonOperator(
         task_id='load_products_id',
         python_callable=load_products,
@@ -155,4 +219,4 @@ with DAG(
         python_callable=end_process,
         dag=dag
     )
-    step_ingestar_orders
+    step_ingestar_orders>>step_ingestar_order_items
