@@ -145,11 +145,7 @@ def ingestar_order_items_process():
     else : 
         print('alerta no hay registros en la tabla order_items')
 
-
-def end_process():
-    print(" FIN DEL PROCESO!")
-
-def load_products():
+def ingestar_products_process():
     print(f" INICIO LOAD PRODUCTS")
     dbconnect = get_connect_mongo()
     dbname=dbconnect["retail_db"]
@@ -209,14 +205,10 @@ with DAG(
         python_callable=ingestar_order_items_process,
         dag=dag
     )
-    step_load = PythonOperator(
-        task_id='load_products_id',
-        python_callable=load_products,
+    step_ingestar_products = PythonOperator(
+        task_id='setp_ingestar_products_process_id',
+        python_callable=ingestar_products_process,
         dag=dag
     )
-    step_end = PythonOperator(
-        task_id='step_end_id',
-        python_callable=end_process,
-        dag=dag
-    )
-    step_ingestar_orders>>step_ingestar_order_items
+
+    step_ingestar_orders>>step_ingestar_order_items>>step_ingestar_products
