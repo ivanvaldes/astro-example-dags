@@ -33,13 +33,14 @@ def transform_date(text):
     
 def ingestar_orders_process():
     print("Ingestar desde orders!")
-    client = bigquery.Client()
+    client = bigquery.Client(project='my-first-project-411501')
     query_string = """
     drop table if exists `my-first-project-411501.dep_raw.orders` ;
     """
     query_job = client.query(query_string)
     rows = list(query_job.result())
     print(rows)
+    print("Borrar orders!")
 
     dbconnect = get_connect_mongo()
     dbname=dbconnect["retail_db"]
