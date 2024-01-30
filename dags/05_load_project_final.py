@@ -331,7 +331,7 @@ def capa_master_process():
         FROM `my-first-project-411501.dep_raw.order_items`
     """
     m_order_items_df = client.query(sql).to_dataframe()
-    client = bigquery.Client()
+    client = bigquery.Client(project='my-first-project-411501')
     sql_2 = """
         SELECT *
         FROM `my-first-project-411501.dep_raw.orders`
