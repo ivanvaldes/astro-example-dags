@@ -10,8 +10,6 @@ from pandas import DataFrame
 from google.cloud import bigquery
 import pandas as pd
 
-pip install db-dtypes
-
 default_args = {
     'owner': 'Datapath',
     'depends_on_past': False,
