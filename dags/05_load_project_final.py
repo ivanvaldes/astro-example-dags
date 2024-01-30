@@ -9,6 +9,7 @@ from pymongo import MongoClient
 from pandas import DataFrame
 from google.cloud import bigquery
 import pandas as pd
+import numpy as np
 
 default_args = {
     'owner': 'Datapath',
@@ -385,6 +386,71 @@ def capa_master_process():
         )
     else : 
         print('alerta no hay registros en la tabla order_items')
+
+    print('orden_item_subtotal_mn')
+
+    headers_files = {
+        'tipocambio':["fecha","compra","venta","error"]
+        }
+    dwn_url_tipcambio='https://www.sunat.gob.pe/a/txt/tipoCambio.txt'
+    tipcambio_df = pd.read_csv(dwn_url_tipcambio, names=headers_files['tipocambio'], sep='|')
+    tipcambio_df.head()
+    list_t = tipcambio_df.values.tolist()
+    vari=list_t[0][1]
+    vari
+    df_master['order_item_subtotal_mn'] = df_master['order_item_subtotal'] * vari
+
+    table = client.get_table(table_id)
+    # Verificar si la columna ya existe en el esquema
+    if table and "order_item_subtotal_mn" not in [field.name for field in table.schema]:
+        # Obtener el esquema actual de la tabla
+        current_schema = table.schema
+
+        # Agregar la nueva columna al esquema
+        new_schema = current_schema + [
+            bigquery.SchemaField("order_item_subtotal_mn", bigquery.enums.SqlTypeNames.FLOAT)
+        ]
+
+        # Crear una nueva tabla con el nuevo esquema
+        new_table = bigquery.Table(table_id, schema=new_schema)
+
+        # Crear la nueva tabla en BigQuery
+        new_table = client.create_table(new_table)
+
+        # Continuar con el código original para cargar la tabla
+        job_config = bigquery.LoadJobConfig(
+            write_disposition="WRITE_TRUNCATE",
+        )
+
+        job = client.load_table_from_dataframe(
+            df_master, table_id, job_config=job_config
+        )  
+        job.result()  # Esperar a que se complete el trabajo.
+
+        table = client.get_table(table_id)  # Hacer una solicitud de API.
+        print(
+            "Loaded {} rows and {} columns to {}".format(
+                table.num_rows, len(table.schema), table_id
+            )
+        )
+        print("Nueva columna 'order_item_subtotal_mn' agregada al esquema.")
+    else:
+        # Continuar con el código original para cargar la tabla
+        job_config = bigquery.LoadJobConfig(
+            write_disposition="WRITE_TRUNCATE",
+        )
+
+        job = client.load_table_from_dataframe(
+            df_master, table_id, job_config=job_config
+        )  
+        job.result()  # Esperar a que se complete el trabajo.
+
+        table = client.get_table(table_id)  # Hacer una solicitud de API.
+        print(
+            "Loaded {} rows and {} columns to {}".format(
+                table.num_rows, len(table.schema), table_id
+            )
+        )
 
 
 with DAG(
