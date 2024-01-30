@@ -411,6 +411,7 @@ def capa_master_process():
     table = client.get_table(table_id)
     # Verificar si la columna ya existe en el esquema
     if table and "order_item_subtotal_mn" not in [field.name for field in table.schema]:
+        print('Existe SI')
         # Obtener el esquema actual de la tabla
         current_schema = table.schema
 
@@ -444,6 +445,7 @@ def capa_master_process():
         print("Nueva columna 'order_item_subtotal_mn' agregada al esquema.")
     else:
         # Continuar con el código original para cargar la tabla
+        print('Existe NO')
         job_config = bigquery.LoadJobConfig(
             write_disposition="WRITE_TRUNCATE",
         )
