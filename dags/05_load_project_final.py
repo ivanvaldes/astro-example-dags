@@ -520,17 +520,12 @@ with DAG(
         dag=dag
     )
     step_capa_master = PythonOperator(
-        task_id='capa_master_process',
-        python_callable=capa_master_process,
-        dag=dag
-    )
-    step_capa_master = PythonOperator(
-        task_id='capa_master_process',
+        task_id='capa_master',
         python_callable=capa_master_process,
         dag=dag
     )
     step_load_bi = PythonOperator(
-        task_id='Load_bi_process',
+        task_id='Load_bi',
         python_callable=load_bi_process,
         dag=dag
     )
