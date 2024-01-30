@@ -57,7 +57,7 @@ def ingestar_orders_process():
 
     orders_rows=len(orders_df)
     if orders_rows>0 :
-        client = bigquery.Client()
+        client = bigquery.Client(project='my-first-project-411501')
 
         table_id =  "my-first-project-411501.dep_raw.orders"
         job_config = bigquery.LoadJobConfig(
