@@ -424,7 +424,7 @@ def capa_master_process():
         new_table = bigquery.Table(table_id, schema=new_schema)
 
         # Crear la nueva tabla en BigQuery
-        new_table = client.update_table(new_table)
+        new_table = client.update_table(new_table, ["schema"])
 
         # Continuar con el código original para cargar la tabla
         job_config = bigquery.LoadJobConfig(
