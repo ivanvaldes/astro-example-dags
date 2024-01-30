@@ -10,6 +10,8 @@ from pandas import DataFrame
 from google.cloud import bigquery
 import pandas as pd
 
+pip install db-dtypes
+
 default_args = {
     'owner': 'Datapath',
     'depends_on_past': False,
@@ -29,6 +31,16 @@ def get_connect_mongo():
 def transform_date(text):
     text = str(text)
     d = text[0:10]
+    return d
+
+def get_group_status(text):
+    text = str(text)
+    if text =='CLOSED':
+        d='END'
+    elif text =='COMPLETE':
+        d='END'
+    else :
+        d='TRANSIT'
     return d
     
 def ingestar_orders_process():
@@ -314,6 +326,69 @@ def ingestar_departaments_process():
     else : 
         print('alerta no hay registros en la tabla departments')
 
+def capa_master_process():
+    client = bigquery.Client(project='my-first-project-411501')
+    sql = """
+        SELECT *
+        FROM `my-first-project-411501.dep_raw.order_items`
+    """
+    m_order_items_df = client.query(sql).to_dataframe()
+    client = bigquery.Client()
+    sql_2 = """
+        SELECT *
+        FROM `my-first-project-411501.dep_raw.orders`
+    """
+    m_orders_df = client.query(sql_2).to_dataframe()
+    df_join = m_orders_df.merge(m_order_items_df, left_on='order_id', right_on='order_item_order_id', how='inner')
+    df_join
+    df_master=df_join[[ 'order_id', 'order_date_x', 'order_customer_id',
+       'order_status',  'order_item_id',
+       'order_item_order_id', 'order_item_product_id', 'order_item_quantity',
+       'order_item_subtotal', 'order_item_product_price']]
+    df_master=df_master.rename(columns={"order_date_x":"order_date"})
+    df_master['order_status_group']  = df_master['order_status'].map(get_group_status)
+    df_master['order_date'] = df_master['order_date'].astype(str)
+    df_master['order_date'] = pd.to_datetime(df_master['order_date'], format='%Y-%m-%d').dt.date
+    df_master
+    df_master.dtypes
+    df_master_rows=len(df_master)
+    if df_master_rows>0 :
+        client = bigquery.Client(project='my-first-project-411501')
+
+        table_id =  "my-first-project-411501.dep_raw.master_order"
+        job_config = bigquery.LoadJobConfig(
+            schema=[
+                bigquery.SchemaField("order_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_date", bigquery.enums.SqlTypeNames.DATE),
+                bigquery.SchemaField("order_customer_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_status", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("order_item_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_item_order_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_item_product_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_item_quantity", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("order_item_subtotal", bigquery.enums.SqlTypeNames.FLOAT),
+                bigquery.SchemaField("order_item_product_price", bigquery.enums.SqlTypeNames.FLOAT),
+                bigquery.SchemaField("order_status_group", bigquery.enums.SqlTypeNames.STRING),
+            ],
+            write_disposition="WRITE_TRUNCATE",
+        )
+
+
+        job = client.load_table_from_dataframe(
+            df_master, table_id, job_config=job_config
+        )  
+        job.result()  # Wait for the job to complete.
+
+        table = client.get_table(table_id)  # Make an API request.
+        print(
+            "Loaded {} rows and {} columns to {}".format(
+                table.num_rows, len(table.schema), table_id
+            )
+        )
+    else : 
+        print('alerta no hay registros en la tabla order_items')
+
+
 with DAG(
     dag_id="final_project",
     schedule="20 04 * * *", 
@@ -350,5 +425,10 @@ with DAG(
         python_callable=ingestar_departaments_process,
         dag=dag
     )
+    step_capa_master = PythonOperator(
+        task_id='setp_capa_master_process_id',
+        python_callable=capa_master_process,
+        dag=dag
+    )
 
-    step_ingestar_orders>>step_ingestar_order_items>>step_ingestar_products>>step_ingestar_customers>>step_ingestar_categories>>step_ingestar_departaments
+    step_ingestar_orders>>step_ingestar_order_items>>step_ingestar_products>>step_ingestar_customers>>step_ingestar_categories>>step_ingestar_departaments>>step_capa_master
