@@ -189,6 +189,131 @@ def ingestar_products_process():
     else : 
         print('alerta no hay registros en la tabla productos')
 
+def ingestar_customers_process():
+    print(f" INICIO LOAD CUSTOMERS")
+    dbconnect = get_connect_mongo()
+    dbname=dbconnect["retail_db"]
+    collection_name = dbname["customers"] 
+
+    customers = collection_name.find({})
+    customers_df = DataFrame(customers)
+    dbconnect.close()
+
+    customers_df['_id'] = customers_df['_id'].astype(str)
+
+    customers_rows=len(customers_df)
+    if customers_rows>0 :
+        client = bigquery.Client(project='my-first-project-411501')
+
+        table_id =  "my-first-project-411501.dep_raw.customers"
+        job_config = bigquery.LoadJobConfig(
+            schema=[
+                bigquery.SchemaField("_id", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("customer_fname", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_lname", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_email", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_password", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_street", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_city", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_state", bigquery.enums.SqlTypeNames.STRING),
+                bigquery.SchemaField("customer_zipcode", bigquery.enums.SqlTypeNames.INTEGER),
+            ],
+            write_disposition="WRITE_TRUNCATE",
+        )
+
+
+        job = client.load_table_from_dataframe(
+            customers_df, table_id, job_config=job_config
+        )  
+        job.result()  # Wait for the job to complete.
+
+        table = client.get_table(table_id)  # Make an API request.
+        print(
+            "Loaded {} rows and {} columns to {}".format(
+                table.num_rows, len(table.schema), table_id
+            )
+        )
+    else : 
+        print('alerta no hay registros en la tabla customers')
+
+def ingestar_categories_process():
+    print(f" INICIO LOAD CATEGORIES")
+    dbconnect = get_connect_mongo()
+    dbname=dbconnect["retail_db"]
+    collection_name = dbname["categories"] 
+    categories = collection_name.find({})
+    categories_df = DataFrame(categories)
+    dbconnect.close()
+    categories_df = categories_df.drop(columns=['_id'])
+
+    categories_rows=len(categories_df)
+    if categories_rows>0 :
+        client = bigquery.Client(project='my-first-project-411501')
+
+        table_id =  "my-first-project-411501.dep_raw.categories"
+        job_config = bigquery.LoadJobConfig(
+            schema=[
+                bigquery.SchemaField("category_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("category_department_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("category_name", bigquery.enums.SqlTypeNames.STRING),
+            ],
+            write_disposition="WRITE_TRUNCATE",
+        )
+
+
+        job = client.load_table_from_dataframe(
+            categories_df, table_id, job_config=job_config
+        )  
+        job.result()  # Wait for the job to complete.
+
+        table = client.get_table(table_id)  # Make an API request.
+        print(
+            "Loaded {} rows and {} columns to {}".format(
+                table.num_rows, len(table.schema), table_id
+            )
+        )
+    else : 
+        print('alerta no hay registros en la tabla categories')
+
+def ingestar_departaments_process():
+    print(f" INICIO LOAD DEPARTAMENTS")
+    dbconnect = get_connect_mongo()
+    dbname=dbconnect["retail_db"]
+    collection_name = dbname["departments"] 
+    departments = collection_name.find({})
+    departments_df = DataFrame(departments)
+    dbconnect.close()
+    departments_df = departments_df.drop(columns=['_id'])
+
+    departments_rows=len(departments_df)
+    if departments_rows>0 :
+        client = bigquery.Client(project='my-first-project-411501')
+
+        table_id =  "my-first-project-411501.dep_raw.departments"
+        job_config = bigquery.LoadJobConfig(
+            schema=[
+                bigquery.SchemaField("department_id", bigquery.enums.SqlTypeNames.INTEGER),
+                bigquery.SchemaField("department_name", bigquery.enums.SqlTypeNames.STRING)
+            ],
+            write_disposition="WRITE_TRUNCATE",
+        )
+
+
+        job = client.load_table_from_dataframe(
+            departments_df, table_id, job_config=job_config
+        )  
+        job.result()  # Wait for the job to complete.
+
+        table = client.get_table(table_id)  # Make an API request.
+        print(
+            "Loaded {} rows and {} columns to {}".format(
+                table.num_rows, len(table.schema), table_id
+            )
+        )
+    else : 
+        print('alerta no hay registros en la tabla departments')
+
 with DAG(
     dag_id="final_project",
     schedule="20 04 * * *", 
@@ -210,5 +335,20 @@ with DAG(
         python_callable=ingestar_products_process,
         dag=dag
     )
+    step_ingestar_customers = PythonOperator(
+        task_id='setp_ingestar_customers_process_id',
+        python_callable=ingestar_customers_process,
+        dag=dag
+    )
+    step_ingestar_categories = PythonOperator(
+        task_id='setp_ingestar_categories_process_id',
+        python_callable=ingestar_categories_process,
+        dag=dag
+    )
+    step_ingestar_departaments = PythonOperator(
+        task_id='setp_ingestar_departaments_process_id',
+        python_callable=ingestar_departaments_process,
+        dag=dag
+    )
 
-    step_ingestar_orders>>step_ingestar_order_items>>step_ingestar_products
+    step_ingestar_orders>>step_ingestar_order_items>>step_ingestar_products>>step_ingestar_customers>>step_ingestar_categories>>step_ingestar_departaments
