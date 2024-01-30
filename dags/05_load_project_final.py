@@ -483,6 +483,80 @@ def load_bi_process():
     rows = list(query_job.result())
     print(rows)
 
+def load_segment_process():
+    client = bigquery.Client(project='my-first-project-411501')
+    query_string = """
+    create or replace table `my-first-project-411501.dep_raw.client_segment` as
+    select customer_id,category_name , order_item_subtotal from
+    (
+    SELECT customer_id,category_name,order_item_subtotal,
+    RANK() OVER (PARTITION BY customer_id ORDER BY order_item_subtotal DESC) AS rank_ 
+    FROM (
+        SELECT 
+        d.customer_id ,c.category_name 
+        , sum (a.order_item_subtotal) order_item_subtotal
+        FROM `my-first-project-411501.dep_raw.master_order` a
+        inner join  `my-first-project-411501.dep_raw.products` b on
+        a.order_item_product_id=b.product_id
+        inner join `my-first-project-411501.dep_raw.categories` c on
+        b.product_category_id=c.category_id
+        inner join `my-first-project-411501.dep_raw.customers` d on
+        a.order_customer_id=d.customer_id
+        group by 1,2
+    )
+    )
+    where rank_=1
+    """
+    query_job = client.query(query_string)
+    rows = list(query_job.result())
+    print(rows)
+
+def load_personal_mongodb_process():
+    client_bq = bigquery.Client(project='my-first-project-411501')
+
+    # Configuración de conexión a MongoDB
+    PERSONAL_MONGODB_CONNECTION_STRING ="mongodb+srv://cluster0.ko3sfg6.mongodb.net/?retryWrites=true&w=majority"
+    client_mongo = MongoClient(PERSONAL_MONGODB_CONNECTION_STRING)  # Ajusta la URI de conexión según tu configuración
+    db = client_mongo['dbTest']  # Reemplaza 'tu_base_de_datos' con el nombre de tu base de datos en MongoDB
+    collection = db['myFirstCollection']  # Nombre de la colección en MongoDB
+
+    # Ejecutar la consulta en BigQuery
+    query_string = """
+    create or replace table `my-first-project-411501.dep_raw.client_segment` as
+    select customer_id,category_name , order_item_subtotal from
+    (
+    SELECT customer_id,category_name,order_item_subtotal,
+    RANK() OVER (PARTITION BY customer_id ORDER BY order_item_subtotal DESC) AS rank_ 
+    FROM (
+        SELECT 
+        d.customer_id ,c.category_name 
+        , sum (a.order_item_subtotal) order_item_subtotal
+        FROM `my-first-project-411501.dep_raw.master_order` a
+        inner join  `my-first-project-411501.dep_raw.products` b on
+        a.order_item_product_id=b.product_id
+        inner join `my-first-project-411501.dep_raw.categories` c on
+        b.product_category_id=c.category_id
+        inner join `my-first-project-411501.dep_raw.customers` d on
+        a.order_customer_id=d.customer_id
+        group by 1,2
+    )
+    )
+    where rank_=1
+    """
+    query_job = client_bq.query(query_string)
+    rows = list(query_job.result())
+
+    # Insertar resultados en MongoDB
+    for row in rows:
+        document = {
+            'customer_id': row['customer_id'],
+            'category_name': row['category_name'],
+            'order_item_subtotal': row['order_item_subtotal']
+        }
+        collection.insert_one(document)
+
+    print("Datos insertados en MongoDB correctamente.")
+
 with DAG(
     dag_id="final_project",
     schedule="20 04 * * *", 
@@ -529,5 +603,15 @@ with DAG(
         python_callable=load_bi_process,
         dag=dag
     )
+    step_load_segment = PythonOperator(
+        task_id='Load_segment',
+        python_callable=load_segment_process,
+        dag=dag
+    )
+    step_load_personal_mongodb = PythonOperator(
+        task_id='Load_personal_mongodb',
+        python_callable=load_personal_mongodb_process,
+        dag=dag
+    )
 
-    step_load_orders>>step_load_order_items>>step_load_products>>step_load_customers>>step_load_categories>>step_load_departaments>>step_capa_master>>step_load_bi
+    step_load_orders>>step_load_order_items>>step_load_products>>step_load_customers>>step_load_categories>>step_load_departaments>>step_capa_master>>step_load_bi>>step_load_segment>>step_load_personal_mongodb
