@@ -327,12 +327,20 @@ def ingestar_departaments_process():
 
 def capa_master_process():
     client = bigquery.Client(project='my-first-project-411501')
+    query_string = """
+    drop table if exists `my-first-project-411501.dep_raw.master_order` ;
+    """
+    query_job = client.query(query_string)
+    rows = list(query_job.result())
+    print(rows)
+    print("Borrar master_order!")
+    
+    
     sql = """
         SELECT *
         FROM `my-first-project-411501.dep_raw.order_items`
     """
     m_order_items_df = client.query(sql).to_dataframe()
-    client = bigquery.Client(project='my-first-project-411501')
     sql_2 = """
         SELECT *
         FROM `my-first-project-411501.dep_raw.orders`
@@ -460,37 +468,37 @@ with DAG(
     default_args=default_args
 ) as dag:
     step_ingestar_orders = PythonOperator(
-        task_id='step_ingestar_orders_id',
+        task_id='Load_orders',
         python_callable=ingestar_orders_process,
         dag=dag
     )
     step_ingestar_order_items = PythonOperator(
-        task_id='step_ingestar_order_items_id',
+        task_id='Load_order_items',
         python_callable=ingestar_order_items_process,
         dag=dag
     )
     step_ingestar_products = PythonOperator(
-        task_id='setp_ingestar_products_process_id',
+        task_id='Load_products',
         python_callable=ingestar_products_process,
         dag=dag
     )
     step_ingestar_customers = PythonOperator(
-        task_id='setp_ingestar_customers_process_id',
+        task_id='Load_customers',
         python_callable=ingestar_customers_process,
         dag=dag
     )
     step_ingestar_categories = PythonOperator(
-        task_id='setp_ingestar_categories_process_id',
+        task_id='Load_categories',
         python_callable=ingestar_categories_process,
         dag=dag
     )
     step_ingestar_departaments = PythonOperator(
-        task_id='setp_ingestar_departaments_process_id',
+        task_id='Load_departaments',
         python_callable=ingestar_departaments_process,
         dag=dag
     )
     step_capa_master = PythonOperator(
-        task_id='setp_capa_master_process_id',
+        task_id='capa_master_process',
         python_callable=capa_master_process,
         dag=dag
     )
