@@ -42,8 +42,8 @@ def get_group_status(text):
         d='TRANSIT'
     return d
     
-def ingestar_orders_process():
-    print("Ingestar desde orders!")
+def load_orders_process():
+    print("Load orders!")
     client = bigquery.Client(project='my-first-project-411501')
     query_string = """
     drop table if exists `my-first-project-411501.dep_raw.orders` ;
@@ -97,8 +97,8 @@ def ingestar_orders_process():
     else : 
         print('alerta no hay registros en la tabla orders')
 
-def ingestar_order_items_process():
-    print("Ingestar desde order_items!")
+def load_order_items_process():
+    print("Load order_items!")
     client = bigquery.Client(project='my-first-project-411501')
     query_string = """
     drop table if exists `my-first-project-411501.dep_raw.order_items` ;
@@ -156,8 +156,8 @@ def ingestar_order_items_process():
     else : 
         print('alerta no hay registros en la tabla order_items')
 
-def ingestar_products_process():
-    print(f" INICIO LOAD PRODUCTS")
+def load_products_process():
+    print(f"Load PRODUCTS")
     dbconnect = get_connect_mongo()
     dbname=dbconnect["retail_db"]
     collection_name = dbname["products"] 
@@ -200,8 +200,8 @@ def ingestar_products_process():
     else : 
         print('alerta no hay registros en la tabla productos')
 
-def ingestar_customers_process():
-    print(f" INICIO LOAD CUSTOMERS")
+def load_customers_process():
+    print(f"Load CUSTOMERS")
     dbconnect = get_connect_mongo()
     dbname=dbconnect["retail_db"]
     collection_name = dbname["customers"] 
@@ -248,8 +248,8 @@ def ingestar_customers_process():
     else : 
         print('alerta no hay registros en la tabla customers')
 
-def ingestar_categories_process():
-    print(f" INICIO LOAD CATEGORIES")
+def load_categories_process():
+    print(f"Load CATEGORIES")
     dbconnect = get_connect_mongo()
     dbname=dbconnect["retail_db"]
     collection_name = dbname["categories"] 
@@ -287,8 +287,8 @@ def ingestar_categories_process():
     else : 
         print('alerta no hay registros en la tabla categories')
 
-def ingestar_departaments_process():
-    print(f" INICIO LOAD DEPARTAMENTS")
+def load_departaments_process():
+    print(f"Load DEPARTAMENTS")
     dbconnect = get_connect_mongo()
     dbname=dbconnect["retail_db"]
     collection_name = dbname["departments"] 
@@ -462,6 +462,26 @@ def capa_master_process():
             )
         )
 
+def load_bi_process():
+    client = bigquery.Client(project='my-first-project-411501')
+    query_string = """
+    create or replace table `my-first-project-411501.dep_raw.bi_orders` as
+    SELECT 
+    order_date,c.category_name ,d.department_name 
+    , sum (a.order_item_subtotal) order_item_subtotal
+    , sum (a.order_item_quantity) order_item_quantity
+    FROM `my-first-project-411501.dep_raw.master_order` a
+    inner join  `my-first-project-411501.dep_raw.products` b on
+    a.order_item_product_id=b.product_id
+    inner join `my-first-project-411501.dep_raw.categories` c on
+    b.product_category_id=c.category_id
+    inner join `my-first-project-411501.dep_raw.departments` d on
+    c.category_department_id=d.department_id
+    group by order_date,c.category_name ,d.department_name
+    """
+    query_job = client.query(query_string)
+    rows = list(query_job.result())
+    print(rows)
 
 with DAG(
     dag_id="final_project",
@@ -469,34 +489,34 @@ with DAG(
     start_date=days_ago(2), 
     default_args=default_args
 ) as dag:
-    step_ingestar_orders = PythonOperator(
+    step_load_orders = PythonOperator(
         task_id='Load_orders',
-        python_callable=ingestar_orders_process,
+        python_callable=load_orders_process,
         dag=dag
     )
-    step_ingestar_order_items = PythonOperator(
+    step_load_order_items = PythonOperator(
         task_id='Load_order_items',
-        python_callable=ingestar_order_items_process,
+        python_callable=load_order_items_process,
         dag=dag
     )
-    step_ingestar_products = PythonOperator(
+    step_load_products = PythonOperator(
         task_id='Load_products',
-        python_callable=ingestar_products_process,
+        python_callable=load_products_process,
         dag=dag
     )
-    step_ingestar_customers = PythonOperator(
+    step_load_customers = PythonOperator(
         task_id='Load_customers',
-        python_callable=ingestar_customers_process,
+        python_callable=load_customers_process,
         dag=dag
     )
-    step_ingestar_categories = PythonOperator(
+    step_load_categories = PythonOperator(
         task_id='Load_categories',
-        python_callable=ingestar_categories_process,
+        python_callable=load_categories_process,
         dag=dag
     )
-    step_ingestar_departaments = PythonOperator(
+    step_load_departaments = PythonOperator(
         task_id='Load_departaments',
-        python_callable=ingestar_departaments_process,
+        python_callable=load_departaments_process,
         dag=dag
     )
     step_capa_master = PythonOperator(
@@ -504,5 +524,15 @@ with DAG(
         python_callable=capa_master_process,
         dag=dag
     )
+    step_capa_master = PythonOperator(
+        task_id='capa_master_process',
+        python_callable=capa_master_process,
+        dag=dag
+    )
+    step_load_bi = PythonOperator(
+        task_id='Load_bi_process',
+        python_callable=load_bi_process,
+        dag=dag
+    )
 
-    step_ingestar_orders>>step_ingestar_order_items>>step_ingestar_products>>step_ingestar_customers>>step_ingestar_categories>>step_ingestar_departaments>>step_capa_master
+    step_load_orders>>step_load_order_items>>step_load_products>>step_load_customers>>step_load_categories>>step_load_departaments>>step_capa_master>>step_load_bi
