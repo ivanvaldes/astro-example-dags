@@ -515,14 +515,13 @@ def load_personal_mongodb_process():
     client_bq = bigquery.Client(project='my-first-project-411501')
 
     # Configuración de conexión a MongoDB
-    PERSONAL_MONGODB_CONNECTION_STRING ="mongodb+srv://cluster0.ko3sfg6.mongodb.net/?retryWrites=true&w=majority"
-    client_mongo = MongoClient(PERSONAL_MONGODB_CONNECTION_STRING)  # Ajusta la URI de conexión según tu configuración
+    PERSONAL_MONGODB_CONNECTION_STRING ="mongodb+srv://ivmigliore:ivmigliore@cluster0.ko3sfg6.mongodb.net/"
+    client_mongo = MongoClient(PERSONAL_MONGODB_CONNECTION_STRING) # Ajusta la URI de conexión según tu configuración
     db = client_mongo['dbTest']  # Reemplaza 'tu_base_de_datos' con el nombre de tu base de datos en MongoDB
     collection = db['myFirstCollection']  # Nombre de la colección en MongoDB
 
     # Ejecutar la consulta en BigQuery
     query_string = """
-    create or replace table `my-first-project-411501.dep_raw.client_segment` as
     select customer_id,category_name , order_item_subtotal from
     (
     SELECT customer_id,category_name,order_item_subtotal,
