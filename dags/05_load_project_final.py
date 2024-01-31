@@ -558,7 +558,7 @@ def load_personal_mongodb_process():
 
 with DAG(
     dag_id="final_project",
-    schedule="20 04 * * *", 
+    schedule='0 4 * * 1',  # Ejecutar los lunes a las 04:00
     start_date=days_ago(2), 
     default_args=default_args
 ) as dag:
